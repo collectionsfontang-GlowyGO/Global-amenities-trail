@@ -1,0 +1,1 @@
+# Global-amenities-trail
