@@ -30,7 +30,7 @@ class _GlobalMapState extends State<GlobalMap> {
 
   final List<String> _labels = ['垃圾桶', '廁所', '飲水機', '坡道', '行動裝置充電', 'wifi熱點', '熱水', '尿布台', '行人椅'];
   
-  // 初始空集合，保證預設不顯示任何設施
+  // 預設空集合，保證初始不顯示任何設施
   final Set<String> _activeFilters = {};
 
   // 優化：避免過多無用的資料請求
@@ -61,7 +61,7 @@ class _GlobalMapState extends State<GlobalMap> {
   @override
   void initState() {
     super.initState();
-    // 預設不執行資料載入，只有在標籤選擇後才開始載入資料
+    // 移除 initState 中的預設資料請求，確保一開始不載入設施
   }
 
   @override
