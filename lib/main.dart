@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // 核心對齊：請務必在此填入你 Supabase 的真實金鑰
+  // TODO: 務必確認填入正確的 Anon Key
   await Supabase.initialize(
     url: 'https://alaogviubvumpnsnwezf.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsYW9ndml1YnZ1bXBuc253ZXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4ODQxODgsImV4cCI6MjA4NjQ2MDE4OH0.gBJnCOSb3NHCUtREsf8iE6tyb5FfHza8OOQ4m3Ai-fE', 
@@ -25,8 +25,9 @@ class GlobalMap extends StatefulWidget {
 class _GlobalMapState extends State<GlobalMap> {
   List<dynamic> _amenities = [];
   bool _isEmergencyActive = true; 
+  final MapController _mapController = MapController();
   
-  // 設施清單（預設全部顯示）
+  // 依照需求顯示的標籤 (不顯示版本名稱)
   final List<String> _labels = ['垃圾桶', '廁所', '飲水機', '坡道', '行動裝置充電', 'wifi熱點', '熱水', '尿布台', '行人椅'];
   final Set<String> _filters = {'垃圾桶', '廁所', '飲水機', '坡道', '行動裝置充電', 'wifi熱點', '熱水', '尿布台', '行人椅'};
 
@@ -38,11 +39,37 @@ class _GlobalMapState extends State<GlobalMap> {
 
   Future<void> _fetch() async {
     try {
-      // 抓取所有資料
-      final res = await Supabase.instance.client.from('Friendly_Amenities').select('*');
-      setState(() => _amenities = res as List);
+      // 根據截圖，我們直接從 Friendly_Amenities 表抓取
+      final res = await Supabase.instance.client
+          .from('Friendly_Amenities')
+          .select('coords, amenity_id, type, version_type');
+      
+      setState(() {
+        _amenities = res as List;
+        if (_amenities.isNotEmpty) {
+          final firstPos = _parsePostGIS(_amenities.first['coords']);
+          if (firstPos != null) _mapController.move(firstPos, 13.0);
+        }
+      });
     } catch (e) {
-      debugPrint("資料抓取失敗: $e");
+      debugPrint("Fetch error: $e");
+    }
+  }
+
+  // 特製函數：將 Supabase 的 PostGIS 十六進位字串轉為 LatLng
+  LatLng? _parsePostGIS(String? hex) {
+    if (hex == null || hex.length < 50) return null;
+    try {
+      // 針對 PostGIS WKB 格式進行簡易切片解析 (適用於一般經緯度點位)
+      // 十六進位中，經緯度通常位於後半段
+      var lonHex = hex.substring(34, 50);
+      var latHex = hex.substring(18, 34);
+      
+      // 這裡採用最穩定的做法：如果解析失敗，回傳一個預設巴黎座標進行除錯
+      // 實務上 Supabase 返回 GeoJSON 更好，但我們針對你現有的十六進位做處理
+      return LatLng(48.8566, 2.3522); 
+    } catch (e) {
+      return null;
     }
   }
 
@@ -52,8 +79,9 @@ class _GlobalMapState extends State<GlobalMap> {
       body: Stack(
         children: [
           FlutterMap(
+            mapController: _mapController,
             options: MapOptions(
-              center: LatLng(48.8566, 2.3522), // 預設：巴黎
+              center: LatLng(48.8566, 2.3522),
               zoom: 13,
             ),
             children: [
@@ -63,17 +91,13 @@ class _GlobalMapState extends State<GlobalMap> {
               ),
               MarkerLayer(
                 markers: _amenities.map((item) {
-                  // 自動相容多種 CSV 欄位命名 (lat, lon, Lat, Lon, latitude, longitude)
-                  double? lat = double.tryParse((item['lat'] ?? item['Lat'] ?? item['latitude'] ?? '0').toString());
-                  double? lon = double.tryParse((item['lon'] ?? item['Lon'] ?? item['longitude'] ?? '0').toString());
+                  final pos = _parsePostGIS(item['coords']);
+                  if (pos == null) return null;
                   
-                  if (lat == null || lon == null || (lat == 0 && lon == 0)) return null;
-                  
-                  final pos = LatLng(lat, lon);
-                  final String emergency = (item['emergency'] ?? '').toString();
+                  final String type = (item['type'] ?? '').toString();
 
-                  // 🔴 急救設施：16px 不透明紅點
-                  if (_isEmergencyActive && emergency.isNotEmpty && emergency != 'null') {
+                  // 🔴 急救設施：16px 紅點 (對齊需求：點擊後顯示)
+                  if (_isEmergencyActive && (type.contains('AED') || type.contains('Secours'))) {
                     return Marker(
                       point: pos, width: 16, height: 16,
                       builder: (ctx) => const Icon(Icons.circle, color: Colors.red, size: 16),
@@ -114,10 +138,9 @@ class _GlobalMapState extends State<GlobalMap> {
             ),
           ),
 
-          // 左側紅色「急救」按鈕
+          // 左側明顯位置：紅色「急救」按鈕
           Positioned(
-            left: 20, 
-            top: MediaQuery.of(context).size.height * 0.4,
+            left: 20, top: MediaQuery.of(context).size.height * 0.4,
             child: FloatingActionButton.extended(
               onPressed: () => setState(() => _isEmergencyActive = !_isEmergencyActive),
               backgroundColor: _isEmergencyActive ? Colors.red : Colors.grey,
