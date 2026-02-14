@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // 請務必確認這裡已填入你正確的 Supabase URL 與 Anon Key
+  // 核心對齊：請務必在此填入你 Supabase 的真實金鑰
   await Supabase.initialize(
     url: 'https://alaogviubvumpnsnwezf.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsYW9ndml1YnZ1bXBuc253ZXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4ODQxODgsImV4cCI6MjA4NjQ2MDE4OH0.gBJnCOSb3NHCUtREsf8iE6tyb5FfHza8OOQ4m3Ai-fE', 
@@ -26,7 +26,7 @@ class _GlobalMapState extends State<GlobalMap> {
   List<dynamic> _amenities = [];
   bool _isEmergencyActive = true; 
   
-  // 設施清單與預設過濾（包含普及、育兒、銀髮設施）
+  // 設施清單（預設全部顯示）
   final List<String> _labels = ['垃圾桶', '廁所', '飲水機', '坡道', '行動裝置充電', 'wifi熱點', '熱水', '尿布台', '行人椅'];
   final Set<String> _filters = {'垃圾桶', '廁所', '飲水機', '坡道', '行動裝置充電', 'wifi熱點', '熱水', '尿布台', '行人椅'};
 
@@ -38,10 +38,11 @@ class _GlobalMapState extends State<GlobalMap> {
 
   Future<void> _fetch() async {
     try {
+      // 抓取所有資料
       final res = await Supabase.instance.client.from('Friendly_Amenities').select('*');
       setState(() => _amenities = res as List);
     } catch (e) {
-      debugPrint("Supabase Fetch Error: $e");
+      debugPrint("資料抓取失敗: $e");
     }
   }
 
@@ -52,7 +53,7 @@ class _GlobalMapState extends State<GlobalMap> {
         children: [
           FlutterMap(
             options: MapOptions(
-              center: LatLng(48.8566, 2.3522), // 預設中心：巴黎
+              center: LatLng(48.8566, 2.3522), // 預設：巴黎
               zoom: 13,
             ),
             children: [
@@ -62,24 +63,24 @@ class _GlobalMapState extends State<GlobalMap> {
               ),
               MarkerLayer(
                 markers: _amenities.map((item) {
-                  // 解析座標 (對齊 CSV 欄位 lat, lon)
-                  final double lat = double.tryParse(item['lat'].toString()) ?? 0.0;
-                  final double lon = double.tryParse(item['lon'].toString()) ?? 0.0;
-                  final pos = LatLng(lat, lon);
+                  // 自動相容多種 CSV 欄位命名 (lat, lon, Lat, Lon, latitude, longitude)
+                  double? lat = double.tryParse((item['lat'] ?? item['Lat'] ?? item['latitude'] ?? '0').toString());
+                  double? lon = double.tryParse((item['lon'] ?? item['Lon'] ?? item['longitude'] ?? '0').toString());
                   
-                  final String name = item['name'] ?? '';
-                  final String amenity = item['amenity'] ?? '';
-                  final String emergency = item['emergency'] ?? '';
+                  if (lat == null || lon == null || (lat == 0 && lon == 0)) return null;
+                  
+                  final pos = LatLng(lat, lon);
+                  final String emergency = (item['emergency'] ?? '').toString();
 
-                  // 🔴 急救設施：16px 不透明紅點 (AED, 滅火器, 消防栓)
-                  if (_isEmergencyActive && (emergency.isNotEmpty || name.contains('AED'))) {
+                  // 🔴 急救設施：16px 不透明紅點
+                  if (_isEmergencyActive && emergency.isNotEmpty && emergency != 'null') {
                     return Marker(
                       point: pos, width: 16, height: 16,
                       builder: (ctx) => const Icon(Icons.circle, color: Colors.red, size: 16),
                     );
                   }
 
-                  // 🟠 友善設施：10px 小橘點, 透明度 30% (符合最新指令)
+                  // 🟠 友善設施：10px 小橘點, 透明度 30%
                   return Marker(
                     point: pos, width: 10, height: 10,
                     builder: (ctx) => Icon(
@@ -88,12 +89,12 @@ class _GlobalMapState extends State<GlobalMap> {
                       size: 10,
                     ),
                   );
-                }).toList(),
+                }).whereType<Marker>().toList(),
               ),
             ],
           ),
           
-          // 頂部標籤列 (隱藏版本名稱，僅顯示設施)
+          // 頂部標籤列
           Positioned(
             top: 50, left: 0, right: 0,
             child: SingleChildScrollView(
@@ -113,7 +114,7 @@ class _GlobalMapState extends State<GlobalMap> {
             ),
           ),
 
-          // 左側明顯位置：紅色「急救」按鈕
+          // 左側紅色「急救」按鈕
           Positioned(
             left: 20, 
             top: MediaQuery.of(context).size.height * 0.4,
