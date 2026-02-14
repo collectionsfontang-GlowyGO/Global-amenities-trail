@@ -30,9 +30,10 @@ class _GlobalMapState extends State<GlobalMap> {
 
   final List<String> _labels = ['垃圾桶', '廁所', '飲水機', '坡道', '行動裝置充電', 'wifi熱點', '熱水', '尿布台', '行人椅'];
   
-  // 1. 預設空集合，保證初始地圖無點位
+  // 初始空集合，保證預設不顯示任何設施
   final Set<String> _activeFilters = {};
 
+  // 優化：避免過多無用的資料請求
   Future<void> _fetchNearby(double lat, double lon) async {
     if (!mounted) return;
     setState(() {
@@ -41,7 +42,7 @@ class _GlobalMapState extends State<GlobalMap> {
     });
 
     try {
-      // 搜尋視野中心 5km 內的所有設施
+      // 搜尋範圍設定為 5km
       const double offset = 5.0 / 111.0; 
       final res = await Supabase.instance.client
           .from('Friendly_Amenities')
@@ -60,12 +61,12 @@ class _GlobalMapState extends State<GlobalMap> {
   @override
   void initState() {
     super.initState();
-    // 2. 初始不執行任何搜尋，落實「預設空白」
+    // 預設不執行資料載入，只有在標籤選擇後才開始載入資料
   }
 
   @override
   Widget build(BuildContext context) {
-    // 3. 點位渲染：實心橘點、無光暈
+    // 優化：過濾標記的顯示邏輯
     final filteredMarkers = _amenities.where((item) {
       final type = item['type']?.toString() ?? '';
       final bool isEmergency = type.contains('AED') || type.contains('Secours');
@@ -120,7 +121,7 @@ class _GlobalMapState extends State<GlobalMap> {
             ],
           ),
           
-          // 4. 重點修正：手寫 Container 標籤列，徹底移除 ✓ 符號
+          // 標籤列，顯示沒有勾選框
           Positioned(
             top: 50, left: 0, right: 0,
             child: SingleChildScrollView(
@@ -138,7 +139,7 @@ class _GlobalMapState extends State<GlobalMap> {
                             _activeFilters.remove(label);
                           } else {
                             _activeFilters.add(label);
-                            // 第一次點擊時才載入資料
+                            // 只有當選擇後才開始載入資料
                             if (_amenities.isEmpty) _fetchNearby(_mapController.center.latitude, _mapController.center.longitude);
                           }
                         });
@@ -150,7 +151,6 @@ class _GlobalMapState extends State<GlobalMap> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [const BoxShadow(color: Colors.black12, blurRadius: 4)],
                         ),
-                        // 這裡純顯示文字，不使用任何帶有勾選框的 Widget
                         child: Text(
                           label, 
                           style: TextStyle(
@@ -166,6 +166,7 @@ class _GlobalMapState extends State<GlobalMap> {
             ),
           ),
 
+          // 顯示搜尋此區域按鈕
           if (_showSearchButton)
             Positioned(
               top: 110, left: MediaQuery.of(context).size.width / 2 - 80,
@@ -177,7 +178,7 @@ class _GlobalMapState extends State<GlobalMap> {
               ),
             ),
 
-          // 5. 左側「急救」按鈕
+          // 急救按鈕
           Positioned(
             left: 20, top: MediaQuery.of(context).size.height * 0.4,
             child: FloatingActionButton(
