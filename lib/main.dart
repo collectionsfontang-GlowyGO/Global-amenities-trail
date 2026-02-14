@@ -8,7 +8,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(
     url: 'https://alaogviubvumpnsnwezf.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsYW9ndml1YnZ1bXBuc253ZXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4ODQxODgsImV4cCI6MjA4NjQ2MDE4OH0.gBJnCOSb3NHCUtREsf8iE6tyb5FfHza8OOQ4m3Ai-fE', // 務必填入你的真實 Key
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsYW9ndml1YnZ1bXBuc253ZXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4ODQxODgsImV4cCI6MjA4NjQ2MDE4OH0.gBJnCOSb3NHCUtREsf8iE6tyb5FfHza8OOQ4m3Ai-fE', // 請確保填入正確 Key
   );
   runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: GlobalMap()));
 }
@@ -63,7 +63,7 @@ class _GlobalMapState extends State<GlobalMap> {
 
   @override
   Widget build(BuildContext context) {
-    // 標籤過濾邏輯：確保只有選中標籤的 Marker 會顯示 [cite: 2026-02-14]
+    // 過濾 Marker [cite: 2026-02-14]
     final filteredMarkers = _amenities.where((item) {
       final type = item['type']?.toString() ?? '';
       return _activeFilters.any((filter) => type.contains(filter));
@@ -91,8 +91,10 @@ class _GlobalMapState extends State<GlobalMap> {
     }).whereType<Marker>().toList();
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
+          // 地圖本體
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -114,7 +116,7 @@ class _GlobalMapState extends State<GlobalMap> {
             ],
           ),
           
-          // 頂部標籤列：徹底移除 Checkmark (✓)
+          // 客製化標籤列：絕對沒有勾選框 (✓)
           Positioned(
             top: 50, left: 0, right: 0,
             child: SingleChildScrollView(
@@ -123,27 +125,35 @@ class _GlobalMapState extends State<GlobalMap> {
               child: Row(
                 children: _labels.map((label) {
                   bool isSelected = _activeFilters.contains(label);
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(label),
-                      selected: isSelected,
-                      showCheckmark: false, // 這裡強制設為 false，徹底移除勾選符號
-                      selectedColor: Colors.orange.withOpacity(0.7),
-                      backgroundColor: Colors.white.withOpacity(0.9),
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) _activeFilters.remove(label);
+                        else _activeFilters.add(label);
+                      });
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.orange.withOpacity(0.8) : Colors.white.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected ? Colors.orange : Colors.grey.withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
+                        ],
                       ),
-                      shape: StadiumBorder(side: BorderSide(
-                        color: isSelected ? Colors.orange : Colors.transparent,
-                      )),
-                      onSelected: (val) {
-                        setState(() {
-                          if (val) _activeFilters.add(label);
-                          else _activeFilters.remove(label);
-                        });
-                      },
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black87,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
                   );
                 }).toList(),
@@ -151,12 +161,12 @@ class _GlobalMapState extends State<GlobalMap> {
             ),
           ),
 
-          // 視覺化搜尋按鈕 [cite: 2026-02-14]
+          // 搜尋此區域按鈕
           if (_showSearchButton)
             Positioned(
               top: 110, left: MediaQuery.of(context).size.width / 2 - 80,
               child: ElevatedButton.icon(
-                icon: const Icon(Icons.location_searching, size: 18),
+                icon: const Icon(Icons.refresh, size: 18),
                 label: const Text("搜尋此區域？"),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white, 
@@ -200,7 +210,7 @@ class _GlobalMapState extends State<GlobalMap> {
                   final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lon');
                   if (await canLaunchUrl(url)) await launchUrl(url);
                 }, 
-                child: const Text("導航到此處 (免費跳轉) [cite: 2026-02-12]"),
+                child: const Text("導航到此處 (免費) [cite: 2026-02-12]"),
               ),
             ),
           ],
