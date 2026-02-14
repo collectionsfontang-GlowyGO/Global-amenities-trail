@@ -8,7 +8,7 @@ void main() async {
   // 請確認你的 Supabase Key 填寫正確
   await Supabase.initialize(
     url: 'https://alaogviubvumpnsnwezf.supabase.co',
-    anonKey: 'YOUR_ANON_KEY', 
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsYW9ndml1YnZ1bXBuc253ZXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4ODQxODgsImV4cCI6MjA4NjQ2MDE4OH0.gBJnCOSb3NHCUtREsf8iE6tyb5FfHza8OOQ4m3Ai-fE', 
   );
   runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: GlobalMap()));
 }
