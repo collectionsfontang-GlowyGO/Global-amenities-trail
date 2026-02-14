@@ -30,7 +30,7 @@ class _GlobalMapState extends State<GlobalMap> {
 
   final List<String> _labels = ['垃圾桶', '廁所', '飲水機', '坡道', '行動裝置充電', 'wifi熱點', '熱水', '尿布台', '行人椅'];
   
-  // 核心 1：預設不選取任何設施，地圖保持空白
+  // 1. 預設空集合，保證初始地圖無點位
   final Set<String> _activeFilters = {};
 
   Future<void> _fetchNearby(double lat, double lon) async {
@@ -53,19 +53,19 @@ class _GlobalMapState extends State<GlobalMap> {
 
       if (mounted) setState(() => _amenities = res as List);
     } catch (e) {
-      debugPrint("資料讀取錯誤: $e");
+      debugPrint("Data error: $e");
     }
   }
 
   @override
   void initState() {
     super.initState();
-    // 初始不執行搜尋，確保地圖預設為空
+    // 2. 初始不執行任何搜尋，落實「預設空白」
   }
 
   @override
   Widget build(BuildContext context) {
-    // 過濾 Marker：實心橘點，移除光暈 [cite: 2026-02-14]
+    // 3. 點位渲染：實心橘點、無光暈
     final filteredMarkers = _amenities.where((item) {
       final type = item['type']?.toString() ?? '';
       final bool isEmergency = type.contains('AED') || type.contains('Secours');
@@ -81,14 +81,11 @@ class _GlobalMapState extends State<GlobalMap> {
       return Marker(
         point: LatLng(lat, lon),
         width: 12, height: 12,
-        builder: (ctx) => GestureDetector(
-          onTap: () => _showDetail(type, lat, lon),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isEmergency ? Colors.red : Colors.orange, 
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 1.5),
-            ),
+        builder: (ctx) => Container(
+          decoration: BoxDecoration(
+            color: isEmergency ? Colors.red : Colors.orange, 
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 1.5),
           ),
         ),
       );
@@ -123,7 +120,7 @@ class _GlobalMapState extends State<GlobalMap> {
             ],
           ),
           
-          // 核心 2：自定義標籤列 - 絕無勾選框 (NO CHECKMARK)
+          // 4. 重點修正：手寫 Container 標籤列，徹底移除 ✓ 符號
           Positioned(
             top: 50, left: 0, right: 0,
             child: SingleChildScrollView(
@@ -132,33 +129,34 @@ class _GlobalMapState extends State<GlobalMap> {
               child: Row(
                 children: _labels.map((label) {
                   bool isSelected = _activeFilters.contains(label);
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        if (isSelected) {
-                          _activeFilters.remove(label);
-                        } else {
-                          _activeFilters.add(label);
-                          // 第一次啟用標籤時抓取 5km 資料 [cite: 2026-02-14]
-                          if (_amenities.isEmpty) _fetchNearby(_mapController.center.latitude, _mapController.center.longitude);
-                        }
-                      });
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.orange : Colors.white.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(25),
-                        boxShadow: [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
-                        border: Border.all(color: isSelected ? Colors.orange : Colors.transparent),
-                      ),
-                      child: Text(
-                        label, 
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black87,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          fontSize: 14,
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            _activeFilters.remove(label);
+                          } else {
+                            _activeFilters.add(label);
+                            // 第一次點擊時才載入資料
+                            if (_amenities.isEmpty) _fetchNearby(_mapController.center.latitude, _mapController.center.longitude);
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.orange : Colors.white.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [const BoxShadow(color: Colors.black12, blurRadius: 4)],
+                        ),
+                        // 這裡純顯示文字，不使用任何帶有勾選框的 Widget
+                        child: Text(
+                          label, 
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.black87,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal
+                          ),
                         ),
                       ),
                     ),
@@ -172,19 +170,14 @@ class _GlobalMapState extends State<GlobalMap> {
             Positioned(
               top: 110, left: MediaQuery.of(context).size.width / 2 - 80,
               child: ElevatedButton.icon(
-                icon: const Icon(Icons.refresh, size: 18),
+                icon: const Icon(Icons.refresh),
                 label: const Text("搜尋此區域"),
-                style: ElevatedButton.styleFrom(
-                  shape: const StadiumBorder(), 
-                  backgroundColor: Colors.white, 
-                  foregroundColor: Colors.orange,
-                  elevation: 5,
-                ),
+                style: ElevatedButton.styleFrom(shape: const StadiumBorder(), backgroundColor: Colors.white, foregroundColor: Colors.orange),
                 onPressed: () => _fetchNearby(_mapController.center.latitude, _mapController.center.longitude),
               ),
             ),
 
-          // 左側紅色「急救」按鈕 [cite: 2026-02-14]
+          // 5. 左側「急救」按鈕
           Positioned(
             left: 20, top: MediaQuery.of(context).size.height * 0.4,
             child: FloatingActionButton(
@@ -219,12 +212,11 @@ class _GlobalMapState extends State<GlobalMap> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
                 onPressed: () async {
                   final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lon');
                   if (await canLaunchUrl(url)) await launchUrl(url);
                 }, 
-                child: const Text("免費導航到此 [cite: 2026-02-12]"),
+                child: const Text("開始免費導航"),
               ),
             ),
           ],
